@@ -1,0 +1,15 @@
+opencv-python-headless>=4.9,<5.0
+numpy>=1.26,<3.0
+pytesseract>=0.3.10,<0.4
+Pillow>=10.0
+langchain>=0.3,<0.4
+langchain-core>=0.3,<0.4
+langchain-text-splitters>=0.3,<0.4
+langchain-community>=0.3,<0.4
+langchain-chroma>=0.2,<0.3
+langchain-huggingface>=0.1,<0.4
+langchain-groq>=0.2,<0.4
+chromadb>=0.5,<1.0
+sentence-transformers>=3.0,<6.0
+streamlit>=1.35
+python-dotenv>=1.0
