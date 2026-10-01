@@ -1,96 +1,113 @@
 # Image-Based RAG Question Answering System
 
-Upload an image containing text (scan, screenshot, receipt, notes) and ask questions about it. Answers come **only** from the text found in the image.
+You upload an image that has text in it, the app reads the text, and then you can ask questions about it. The answers come only from what's written in the image.
 
-**Pipeline:** OpenCV preprocessing → Tesseract OCR → text cleaning → LangChain chunking → HuggingFace embeddings → ChromaDB → Groq LLM (Llama 3)
+## Abstract
 
-## Project structure
+This project is an intelligent question answering system that uses Retrieval-Augmented Generation (RAG) to answer questions from images containing text. The uploaded image is first processed using image preprocessing techniques such as grayscale conversion and thresholding. Optical Character Recognition (OCR) is then used to extract the text from the image.
+
+The extracted text is cleaned, divided into smaller chunks, converted into vector embeddings and stored in a vector database (ChromaDB). When the user asks a question, the RAG system searches the stored information for relevant content and gives it as context to an LLM (Large Language Model). The LLM then generates an answer based on the information extracted from the image.
+
+**Keywords:** Python, OpenCV, OCR, LangChain, ChromaDB, RAG, Groq, LLM
+
+## What is RAG?
+
+RAG stands for Retrieval-Augmented Generation.
+
+An LLM only knows what it learned during training. It can't read your image, and when it doesn't know something it sometimes makes up an answer. RAG fixes that in two steps:
+
+- **Retrieval:** search your own data (here, the text from the image) and find the parts that match the question
+- **Generation:** give those parts to the LLM so it writes the answer from them
+
+Think of it like an open book exam. The model isn't answering from memory, it looks at the page you give it and then answers.
+
+## How I built it
+
+1. Upload an image
+2. OpenCV cleans it (grayscale, noise reduction, thresholding)
+3. Tesseract OCR reads the text from the cleaned image
+4. The text is cleaned and split into small chunks using LangChain
+5. Each chunk is turned into numbers (an embedding)
+6. The embeddings are stored in ChromaDB
+7. When you ask a question, ChromaDB finds the closest chunks
+8. Those chunks and your question go to the Groq LLM (Llama 3), which writes the answer from that text only
 
 ```
-image_rag/
-├── rag_pipeline.py   # Core pipeline + CLI
-├── app.py            # Streamlit UI
-├── requirements.txt
-└── README.md
+image -> OpenCV -> OCR -> chunks -> embeddings -> ChromaDB -> Groq LLM -> answer
 ```
 
-## 1. Prerequisites
+## Terms used in this project
 
-- Python 3.10+
-- **Tesseract OCR engine** (separate from the pip package):
-  - Ubuntu/Debian: `sudo apt install tesseract-ocr`
-  - macOS: `brew install tesseract`
-  - Windows: install from https://github.com/UB-Mannheim/tesseract/wiki, then set `TESSERACT_CMD` (see below)
-- A free **Groq API key**: https://console.groq.com/keys
+- **Python:** the language everything is written in
+- **OpenCV:** library for image processing
+- **Grayscale:** turns a colour image into shades of gray
+- **Thresholding:** turns the image into pure black and white so the text stands out
+- **OCR:** Optical Character Recognition, reads text from an image
+- **Tesseract:** the free OCR engine I used
+- **Chunking:** splitting long text into small pieces
+- **Embedding:** text converted into numbers that capture its meaning
+- **Vector database (ChromaDB):** stores embeddings and finds similar ones
+- **LangChain:** framework that connects the splitter, database and LLM
+- **Retriever:** the part that searches ChromaDB for the relevant chunks
+- **LLM:** Large Language Model, the AI that writes the final answer
+- **Groq:** service that runs Llama 3 really fast through an API
+- **RAG:** find the relevant text first, then let the LLM answer from it
 
-## 2. Install
+## What you see when you run the app
+
+**Main page**
+- **Input & controls** (left side): upload box and the OpenCV settings
+  - Grayscale conversion
+  - Noise reduction
+  - Thresholding: Otsu (auto), Manual, Adaptive, Off
+  - Threshold value (only works with Manual)
+  - Extract text button
+- **Output** (right side), with two tabs:
+  - **Preprocessed image:** original next to the cleaned version, updates live
+  - **Extracted text:** the text found, plus Characters, Words and Chunks stored (how many pieces were saved in ChromaDB)
+
+**OpenCV Guide page**
+- Explains every setting in simple words, with a small demo
+
+The web page goes up to showing the extracted text. Asking questions is done from the terminal (see below).
+
+## Folder structure
+
+```
+app.py                   main page
+pages/1_OpenCV_Guide.py  guide page
+rag_pipeline.py          the full pipeline
+requirements.txt
+```
+
+## How to run
+
+Install Tesseract first (it's separate from pip):
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+brew install tesseract              # mac
+# sudo apt install tesseract-ocr    # ubuntu
+```
+
+Then:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-The first run downloads the embedding model (~90 MB).
-
-## 3. Configure
-
-Create a `.env` file in the project folder:
-
-```env
-GROQ_API_KEY=gsk_your_key_here
-
-# Optional overrides
-# GROQ_MODEL=llama-3.1-8b-instant
-# TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
-# CHROMA_DIR=./chroma_db
-# CHUNK_SIZE=500
-# CHUNK_OVERLAP=80
-# TOP_K=4
-```
-
-Or export it directly: `export GROQ_API_KEY=gsk_...` (Windows PowerShell: `$env:GROQ_API_KEY="gsk_..."`).
-
-## 4. Run
-
-**Streamlit UI**
-```bash
 streamlit run app.py
 ```
 
-**CLI**
+To ask questions, get a free key from https://console.groq.com/keys and put it in a `.env` file:
+
+```
+GROQ_API_KEY=your_key_here
+```
+
+Then run:
+
 ```bash
-# Interactive
-python rag_pipeline.py --image sample.png --show-text
-
-# Single question
-python rag_pipeline.py --image sample.png --question "What is the invoice total?"
+python rag_pipeline.py --image sample.png
 ```
 
-**As a library**
-```python
-from rag_pipeline import ImageRAG
-
-rag = ImageRAG()
-rag.ingest("sample.png")
-print(rag.ask("Summarize this image").text)
-```
-
-## How it works
-
-| Step | What happens |
-|------|--------------|
-| 1. Preprocess | Grayscale → upscale small images → non-local-means denoise → Otsu or adaptive threshold (chosen by lighting) → ensure dark-on-light |
-| 2. OCR | `pytesseract` with `--oem 3 --psm 6` |
-| 3. Clean + chunk | Fix hyphenation and whitespace; `RecursiveCharacterTextSplitter` (500 chars, 80 overlap) |
-| 4. Embed + store | `all-MiniLM-L6-v2` embeddings persisted in ChromaDB (one collection per image hash; re-ingesting the same image never duplicates) |
-| 5. RAG chain | Top-k retrieval → strict "context only" prompt → `ChatGroq` (temperature 0) |
-| 6. Query | `ImageRAG.ask(question)` returns the answer plus the retrieved chunks |
-
-## Troubleshooting
-
-- **"Tesseract OCR engine not found"** – install Tesseract and/or set `TESSERACT_CMD`.
-- **"OCR found no readable text"** – use a higher-resolution or better-lit image; handwriting is poorly supported by Tesseract.
-- **Groq auth / model errors** – check `GROQ_API_KEY`; if a model is retired, set `GROQ_MODEL` to a current one from https://console.groq.com/docs/models.
-- **Garbled OCR** – adjust the `--psm` value in `extract_text` (`3` for full pages with columns, `11` for sparse text).
-- Delete the `chroma_db/` folder to reset stored data.
+It gives you a `Q>` prompt in the terminal where you can type questions. Don't push your `.env` file to GitHub, it's already in `.gitignore`.
